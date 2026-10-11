@@ -31,15 +31,15 @@
   Email outreach enables direct communication with customers, but contacting
   every recipient with every campaign is costly and may be perceived as spam.
   Recently, \v{Z}id et al.\ proposed to select the recipients of a new campaign
-  in batches by means of a multi-armed bandit (MAB) with Thompson Sampling (TS),
-  whose parameters are derived from a shallow autoencoder (SAE) trained on
-  historical recipient--template opens. This framework is purely collaborative:
-  its scores are derived from interactions alone, and each campaign template is
-  an opaque identifier, although the decision to open a message depends not only
-  on collaborative patterns but also on the content of the message. In this
-  work, we investigate how dense embeddings of template texts can supply this
-  item signal to the SAE-based MAB by exploiting the similarity between
-  templates, while retaining its main properties: no retraining during active
+  in batches using a multi-armed bandit (MAB) with Thompson Sampling (TS), whose
+  parameters are derived from a shallow autoencoder (SAE) trained on historical
+  recipient--template opens. This framework is purely collaborative: its scores
+  are derived from interactions alone and each campaign template is treated as
+  an opaque identifier, even though whether a message is opened depends not only
+  on collaborative patterns but also on its content. In this work, we
+  investigate how dense embeddings of template texts can add this missing
+  content signal to the SAE-based MAB by exploiting the similarity between
+  templates, while preserving its key properties: no retraining during active
   learning and interpretable components. The original SAE-based MAB serves as
   the baseline.
 \end{abstract}
@@ -55,49 +55,51 @@ Email outreach remains an important marketing channel, yet contacting all
 recipients with every campaign is costly and, when messages are irrelevant,
 damages the sender's reputation~\cite{zid2025active}. This motivates
 recommending each campaign only to the recipients most likely to open it. Every
-new campaign is a cold-start item, but under a sending budget and a deadline,
-messages can be delivered in batches, and the opens observed after each batch
-guide the next selection. This active learning setting combines collaborative
-filtering (CF) with multi-armed bandits (MAB)~\cite{zhao2013interactive}, with
-Thompson Sampling (TS) as a simple and effective
-policy~\cite{russo2018tutorial}.
+new campaign is a cold-start item. However, under a sending budget and a
+deadline, messages can be delivered in batches, and the opens observed after
+each batch guide the next selection. This active learning setting lies at the
+intersection of collaborative filtering (CF) and multi-armed bandits
+(MAB)~\cite{zhao2013interactive}, where Thompson Sampling (TS) is a simple and
+effective policy~\cite{russo2018tutorial}.
 
-\v{Z}id et al.~\cite{zid2025active} solve it with a MAB whose arms are
-recipients and whose TS parameters are derived from a shallow autoencoder
-(SAE)~\cite{steck2019embarrassingly} trained offline on historical opens, so no
-retraining is needed during the campaign. On 131,918 recipients and 160
-templates, it reaches a recall of 0.923 when contacting 25\% of the recipients
-and outperforms a range of baselines across most sending fractions. We refer to
-this model as the \emph{SAE-based MAB} (recapped in
+\v{Z}id et al.~\cite{zid2025active} address this setting with a MAB in which
+each arm is a recipient and the TS parameters are derived from a shallow
+autoencoder (SAE)~\cite{steck2019embarrassingly} trained offline on historical
+opens, so no retraining is needed during the campaign. On a dataset of 131,918
+recipients and 160 templates, it reaches a recall of 0.923 when contacting 25\%
+of the recipients and outperforms a range of baselines across most sending
+fractions. We refer to this model as the \emph{SAE-based MAB} (recapped in
 Section~\ref{sec:recap}) and use it as our baseline.
 
 The SAE-based MAB is purely collaborative: all its signals are derived from the
-interaction matrix, and a template is only a row index of it. Yet whether a
+interaction matrix, and a template is merely a row index in it. Yet whether a
 recipient opens a message depends not only on the CF signal, i.e., on patterns
 shared by recipients with similar behavior, but also on the item signal, i.e.,
-on the content of the message, e.g., a promotional offer versus a newsletter.
-Without the item signal, (1)~the CF signal for a new template is absent at the
-start of a campaign, so the scores are template-independent and the first batch
-is the same for any new template, and (2)~the influence between recipients
-learned by the autoencoder is shared by all templates.
+on the content of the message (e.g., a promotional offer versus a newsletter).
+Without the item signal, (1)~no CF signal for a new template exists at the start
+of a campaign, so the scores are template-independent and the first batch is the
+same for any new template, and (2)~the influence between recipients learned by
+the autoencoder is the same for all templates.
 
-The item signal is available exactly where the CF signal is not: the text of a
-template is known before the first message is sent and can be encoded into a
-dense vector by a pretrained language model~\cite{reimers2019sentence}, and
-similarities between embeddings identify past campaigns that are informative
+The item signal is available precisely where the CF signal is missing: the text
+of a template is known before the first message is sent and can be encoded into
+a dense vector by a pretrained language model~\cite{reimers2019sentence}, and
+similarities between the embeddings identify past campaigns that are informative
 about the new one. Complementing the CF signal with item content is the idea of
 hybrid recommenders, which alleviate
-cold-start~\cite{wang2011collaborative,volkovs2017dropoutnet}, but these methods
-learn content-to-latent mappings on large catalogs, whereas here only 160 templates
-are available, retraining within a running campaign is undesirable, and
-interpretability is desired. The closest works use contextual bandits to select
-promotional offers in email campaigns~\cite{kocherzhenko2022evaluating} or
-structured attributes for active learning under item
-cold-start~\cite{zhu2019addressing}; to the best of our knowledge, neither uses
-the free text of campaigns in a CF-based recipient selection framework.
+cold-start~\cite{wang2011collaborative,volkovs2017dropoutnet}. However, these
+methods learn content-to-latent mappings on large catalogs, which does not suit
+our setting: only 160 templates are available, retraining within a running
+campaign is undesirable, and interpretability is desired. The closest works
+either use contextual bandits to select promotional offers in email
+campaigns~\cite{kocherzhenko2022evaluating} or rely on structured attributes for
+active learning under item cold-start~\cite{zhu2019addressing}; to the best of
+our knowledge, neither uses the free text of campaigns in a CF-based recipient
+selection framework.
 % TODO: verify this claim with a more thorough literature search.
 We therefore investigate how template text embeddings can be incorporated into
-the SAE-based MAB.
+the SAE-based MAB while preserving its main properties: no retraining during
+active learning and interpretable components.
 
 \section{Recap of the Original Model}\label{sec:recap}
 
