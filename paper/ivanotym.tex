@@ -16,10 +16,11 @@
 
 \begin{document}
 
-\title{Your Title Here}
+% TODO: working title, revise once the concrete model is fixed.
+\title{Text-Aware Active Recipient Selection for Email Outreach with SAE-Based Bandits}
 
-\author{Your Name Here}
-\email{your.email@here.com}
+\author{Tymofii Ivanov}
+\email{ivanotym@fit.cvut.cz}
 \affiliation{%
   \institution{Faculty of Information Technology, Czech Technical University in Prague}
   \city{Prague}
@@ -27,18 +28,128 @@
 }
 
 \begin{abstract}
-  Write your abstract here.
+  Email outreach enables direct communication with customers, but contacting
+  every recipient with every campaign is costly and may be perceived as spam.
+  Recently, \v{Z}id et al.\ proposed to select the recipients of a new campaign
+  in batches by means of a multi-armed bandit (MAB) with Thompson Sampling (TS),
+  whose parameters are derived from a shallow autoencoder (SAE) trained on
+  historical recipient--template opens. This framework is purely collaborative:
+  its scores are derived from interactions alone, and each campaign template is
+  an opaque identifier, although the decision to open a message depends not only
+  on collaborative patterns but also on the content of the message. In this
+  work, we investigate how dense embeddings of template texts can supply this
+  item signal to the SAE-based MAB by exploiting the similarity between
+  templates, while retaining its main properties: no retraining during active
+  learning and interpretable components. The original SAE-based MAB serves as
+  the baseline.
 \end{abstract}
 
-\keywords{Keyword 1, Keyword 2, Keyword 3}
+\keywords{Email Outreach, Cold-Start Recommendation, Multi-Armed Bandits,
+Shallow Autoencoders, Text Embeddings}
 
 \maketitle
 
 \section{Introduction}
 
-Write your introduction here. Example of a citation~\cite{koren2009matrix}.
+Email outreach remains an important marketing channel, yet contacting all
+recipients with every campaign is costly and, when messages are irrelevant,
+damages the sender's reputation~\cite{zid2025active}. This motivates
+recommending each campaign only to the recipients most likely to open it. Every
+new campaign is a cold-start item, but under a sending budget and a deadline,
+messages can be delivered in batches, and the opens observed after each batch
+guide the next selection. This active learning setting combines collaborative
+filtering (CF) with multi-armed bandits (MAB)~\cite{zhao2013interactive}, with
+Thompson Sampling (TS) as a simple and effective
+policy~\cite{russo2018tutorial}.
 
-\section{Related Works}
+\v{Z}id et al.~\cite{zid2025active} solve it with a MAB whose arms are
+recipients and whose TS parameters are derived from a shallow autoencoder
+(SAE)~\cite{steck2019embarrassingly} trained offline on historical opens, so no
+retraining is needed during the campaign. On 131,918 recipients and 160
+templates, it reaches a recall of 0.923 when contacting 25\% of the recipients
+and outperforms a range of baselines across most sending fractions. We refer to
+this model as the \emph{SAE-based MAB} (recapped in
+Section~\ref{sec:recap}) and use it as our baseline.
+
+The SAE-based MAB is purely collaborative: all its signals are derived from the
+interaction matrix, and a template is only a row index of it. Yet whether a
+recipient opens a message depends not only on the CF signal, i.e., on patterns
+shared by recipients with similar behavior, but also on the item signal, i.e.,
+on the content of the message, e.g., a promotional offer versus a newsletter.
+Without the item signal, (1)~the CF signal for a new template is absent at the
+start of a campaign, so the scores are template-independent and the first batch
+is the same for any new template, and (2)~the influence between recipients
+learned by the autoencoder is shared by all templates.
+
+The item signal is available exactly where the CF signal is not: the text of a
+template is known before the first message is sent and can be encoded into a
+dense vector by a pretrained language model~\cite{reimers2019sentence}, and
+similarities between embeddings identify past campaigns that are informative
+about the new one. Complementing the CF signal with item content is the idea of
+hybrid recommenders, which alleviate
+cold-start~\cite{wang2011collaborative,volkovs2017dropoutnet}, but these methods
+learn content-to-latent mappings on large catalogs, whereas here only 160 templates
+are available, retraining within a running campaign is undesirable, and
+interpretability is desired. The closest works use contextual bandits to select
+promotional offers in email campaigns~\cite{kocherzhenko2022evaluating} or
+structured attributes for active learning under item
+cold-start~\cite{zhu2019addressing}; to the best of our knowledge, neither uses
+the free text of campaigns in a CF-based recipient selection framework.
+% TODO: verify this claim with a more thorough literature search.
+We therefore investigate how template text embeddings can be incorporated into
+the SAE-based MAB.
+
+\section{Recap of the Original Model}\label{sec:recap}
+
+\paragraph{Setup.} Let $X \in \{0,1\}^{n \times m}$ be the interaction matrix of
+$n$ historical templates and $m$ recipients, where $X_{ij} = 1$ if recipient $j$
+opened template $i$. A new template $n+1$ is sent within a deadline $T$ in $b$
+batches of $k \ll m$ recipients: the first batch at $t = 0$, the following ones
+at intervals of $T/b$, and a final batch at $T$. Let $x(t) \in \{0,1\}^m$ mark
+the recipients who have opened template $n+1$ in $[0,t)$, so that $x(0) = \mathbf{0}$,
+and let $\bar{x}(t) = x(t) / \max(1, \mathbf{1}^{\top} x(t))$. The goal is to
+reach as many of the eventual openers as possible within the sending budget.
+
+\paragraph{Shallow autoencoder.} An SAE with encoder and decoder
+$E, D \in \mathbb{R}^{m \times d}$ is trained once on $X$,
+\begin{equation}\label{eq:sae}
+  \min_{E,D}\; \ell\bigl(X,\, \sigma(X B_{E,D})\bigr), \qquad
+  B_{E,D} = E D^{\top} - \operatorname{diag}\bigl([E \odot D]\,\mathbf{1}_d\bigr),
+\end{equation}
+where $\ell$ is the element-wise binary cross-entropy, $\sigma$ the sigmoid, and
+the diagonal term sets the diagonal of $B_{E,D}$ to zero, ruling out trivial
+self-prediction. The entry $\Sigma_{ij}$ of $\Sigma = \sigma(B_{E,D})$ is the
+probability that recipient $j$ opens a template given that only recipient $i$
+opened it, i.e., the influence of $i$ on $j$.
+
+\paragraph{Arm score.} Each recipient $j$ is an arm with the score
+\begin{equation}\label{eq:score}
+  s_j(t) = \alpha\, \varphi_j\, p_j + (1-\alpha)\, f_j(t),
+\end{equation}
+\begin{equation}\label{eq:components}
+  \begin{aligned}
+    \varphi_j &= \frac{1}{n}\sum_{i=1}^{n} X_{ij}, \qquad
+    p_j = \frac{1}{m-1}\sum_{i \neq j} \Sigma_{ji}, \\
+    f_j(t) &= \bar{x}(t)^{\top} \Sigma_{:,j},
+  \end{aligned}
+\end{equation}
+where $\varphi_j$ is the historic open rate of recipient $j$, $p_j$ their general
+influence on the other recipients, $f_j(t)$ the confidence that $j$ opens given
+the opens of template $n+1$ observed so far, and $\alpha \in [0,1]$ trades off the
+two terms. All three quantities are derived from interactions alone, so the
+score is purely collaborative; the new template enters it only through the
+observed opens $\bar{x}(t)$.
+
+\paragraph{Thompson Sampling.} The score parametrizes a Beta distribution for each
+recipient,
+\begin{equation}\label{eq:ts}
+  a_j(t) = G\, s_j(t), \qquad b_j(t) = G\,\bigl(1 - s_j(t)\bigr),
+\end{equation}
+where $G > 0$ is a confidence modifier: the larger $G$, the narrower the
+distribution. In each batch, one value is drawn from every distribution and the
+$k$ not yet contacted recipients with the highest draws receive the message.
+Since $\Sigma$ is fixed after training, no retraining is needed during active
+learning.
 
 \section{Methodology}
 
