@@ -1,0 +1,52 @@
+%%
+%% NIE-PML semestral project paper template (ACM sigconf).
+%%
+\documentclass[sigconf]{acmart}
+
+%% \BibTeX command to typeset BibTeX logo in the docs
+\AtBeginDocument{%
+  \providecommand\BibTeX{{%
+    Bib\TeX}}}
+
+%% Remove ACM rights and reference information (not needed for the course).
+\setcopyright{none}
+\settopmatter{printacmref=false}
+\renewcommand\footnotetextcopyrightpermission[1]{}
+\acmConference[NIE-PML]{NIE-PML Semestral Project}{2026}{Prague, Czech Republic}
+
+\begin{document}
+
+\title{Your Title Here}
+
+\author{Your Name Here}
+\email{your.email@here.com}
+\affiliation{%
+  \institution{Faculty of Information Technology, Czech Technical University in Prague}
+  \city{Prague}
+  \country{Czech Republic}
+}
+
+\begin{abstract}
+  Write your abstract here.
+\end{abstract}
+
+\keywords{Keyword 1, Keyword 2, Keyword 3}
+
+\maketitle
+
+\section{Introduction}
+
+Write your introduction here. Example of a citation~\cite{koren2009matrix}.
+
+\section{Related Works}
+
+\section{Methodology}
+
+\section{Experiments}
+
+\section{Conclusion}
+
+\bibliographystyle{ACM-Reference-Format}
+\bibliography{ivanotym}
+
+\end{document}
