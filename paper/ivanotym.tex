@@ -32,12 +32,12 @@
   Recently, \v{Z}id et al.\ proposed to select the recipients of a new campaign
   in batches using a multi-armed bandit (MAB) with Thompson Sampling (TS), whose
   parameters are derived from a shallow autoencoder (SAE) trained on historical
-  recipient--template opens. While the components of this framework are
+  recipient--template opens. Although the components of this framework are
   interpretable at the level of recipients, the latent space of its autoencoder
-  is not: nothing makes the latent factors individually meaningful, so the
-  representation of a campaign template says little about what kind of campaign
-  it is. In this work, we investigate how disentangled latent factors can make
-  these template representations semantically meaningful. We combine Euler
+  lacks semantic structure, and the latent representation of a campaign template
+  therefore carries no explicit information about the characteristics of the
+  campaign. In this work, we investigate how disentangled latent factors can
+  make these template representations semantically meaningful. We combine Euler
   encoding, a non-probabilistic disentanglement technique for autoencoders,
   with latent factor guidance, which steers selected factors towards
   template-level statistics derived from the interaction data, and explore the
@@ -76,19 +76,16 @@ Section~\ref{sec:recap}) and use it as our baseline.
 
 The SAE-based MAB is interpretable at the level of recipients: the influence
 matrix $\Sigma$ states how strongly an open by one recipient signals an open by
-another, and each component of the score has a clear meaning. Campaign
-templates, however, are only rows of the interaction matrix, and the latent
-space through which the autoencoder compresses them has no semantic structure.
+another, and each component of the score has a clear meaning. The templates,
+however, are represented only implicitly, through their open vectors compressed
+by the autoencoder, and the resulting latent space has no semantic structure.
 The objective in Eq.~\eqref{eq:sae} depends on the encoder and decoder only
 through their product $ED^{\top}$, so the latent axes are arbitrary: any
 invertible linear transformation of the latent space yields the same model.
-Consequently, the latent representation of a template does not tell whether the
-template behaves like a promotional offer or a newsletter, how quickly it is
-usually opened, or how widely it appeals, and a marketer cannot relate the
-recipients selected for a campaign to the characteristics of the campaign. It is
-also open whether a more structured template representation can improve the
-selected batches, for example by letting the influence between recipients
-depend on what kind of campaign is being sent.
+Consequently, the latent representation of a template cannot be related to
+interpretable characteristics of the campaign. Whether a semantically
+structured template representation can also improve the selected batches
+remains an open question.
 
 Disentangled representation learning aims at latent spaces in which each
 dimension captures a single, independent factor of variation in the
@@ -116,19 +113,20 @@ that it correlates with the interpretability of the learned representation, but
 this does not necessarily carry over to the interpretability of the model's
 output~\cite{dervishaj2025are}.
 
-These ideas suit the SAE-based MAB for two reasons. First, guidance targets can
-be computed from the interaction matrix alone, e.g., the open rate or time-to-open
-statistics of each historical template, so no side information about recipients
-or messages is needed, which is important given the data protection constraints
-of email outreach~\cite{zid2025active}. Second, the latent factors describe
-templates, which is exactly the level at which the original model lacks
-semantics. To the best of our knowledge, guided disentangled latent factors
-have not been used in a CF-based recipient selection framework.
+Latent factor guidance is well suited to the SAE-based MAB framework, since the
+guidance targets, such as the open rate or time-to-open statistics of each
+historical template, can be computed from the interaction data alone. No side
+information about recipients or messages is therefore required, which is
+relevant given the data protection constraints of email
+outreach~\cite{zid2025active}. Euler encoding, in turn, applies a nonlinear
+transformation to the latent code, which motivates replacing the shallow
+autoencoder with a deep one, as in deep CF
+autoencoders~\cite{liang2018variational}. In a deep autoencoder, the influence
+matrix $\Sigma$ is no longer given directly by the weights and has to be
+computed by propagating single-recipient opens through the network.
+To the best of our knowledge, guided disentangled latent factors have not been
+used in a CF-based recipient selection framework.
 % TODO: verify this claim with a more thorough literature search.
-Realizing them, however, changes the model: Euler encoding is a nonlinear layer,
-so the shallow autoencoder has to give way to a deep one, as in deep CF
-autoencoders~\cite{liang2018variational}, and the influence matrix $\Sigma$ is
-then no longer a closed-form product but has to be obtained from the network.
 
 We therefore investigate how guided disentangled latent factors can be
 incorporated into the SAE-based MAB while preserving its main properties: no
@@ -205,10 +203,9 @@ $z$ and back,
     \to \operatorname{Lin}(2d,m) \to \sigma \to \hat{x}.
   \end{aligned}
 \end{equation}
-The first and last layers hold $2dm$ weights each, which is large for
-$m = 131{,}918$ recipients compared to the number of training templates. We
-address this with standard regularization (e.g., weight decay and dropout) and
-expect the disentangling constraint to act as an additional regularizer.
+This model is larger than the original SAE. We address this with
+standard regularization techniques and expect the disentangling constraint to
+help as well.
 
 \paragraph{Euler encoding.} The Euler block follows the DAE~\cite{cha2023orthogonality}
 and its use in CODAE~\cite{cha2025discovering}. Each latent factor is min-max
