@@ -210,15 +210,14 @@ $m = 131{,}918$ recipients compared to the number of training templates. We
 address this with standard regularization (e.g., weight decay and dropout) and
 expect the disentangling constraint to act as an additional regularizer.
 
-\paragraph{Euler encoding.} The Euler block follows the DAE~\cite{cha2023orthogonality}.
-The latent code is min-max normalized over the batch to $\bar{z} \in [0,1]^d$
-(with moving statistics at test time), scaled by $\Lambda \in \mathbb{R}^d$
-obtained from the singular values of a PCA of $X$, which accounts for factors
-with a different number of possible values, perturbed by Gaussian noise during
-training only, and finally mapped to
+\paragraph{Euler encoding.} The Euler block follows the DAE~\cite{cha2023orthogonality}
+and its use in CODAE~\cite{cha2025discovering}. Each latent factor is min-max
+normalized over the batch to $\bar{z}_k \in [0,1]$ (with moving statistics at
+test time) and then stretched by a learnable affine map
+$y_k = \beta_k + \gamma_k \bar{z}_k$, which lets the model choose the arc of the
+circle each factor occupies. The result is mapped to
 \begin{equation}\label{eq:euler}
-  u_k = \bigl(\cos(2\pi \Lambda_k \bar{z}_k),\; \sin(2\pi \Lambda_k \bar{z}_k)\bigr),
-  \qquad k = 1, \dots, d.
+  u_k = \bigl(\cos y_k,\; \sin y_k\bigr), \qquad k = 1, \dots, d.
 \end{equation}
 
 \paragraph{Latent factor guidance.} Following CODAE~\cite{cha2025discovering}, we
