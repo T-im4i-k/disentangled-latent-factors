@@ -16,8 +16,7 @@
 
 \begin{document}
 
-% TODO: working title, revise once the concrete model is fixed.
-\title{Text-Aware Active Recipient Selection for Email Outreach with SAE-Based Bandits}
+\title{Guided Disentangled Latent Factors for Interpretable Active Recipient Selection in Email Outreach}
 
 \author{Tymofii Ivanov}
 \email{ivanotym@fit.cvut.cz}
@@ -33,19 +32,23 @@
   Recently, \v{Z}id et al.\ proposed to select the recipients of a new campaign
   in batches using a multi-armed bandit (MAB) with Thompson Sampling (TS), whose
   parameters are derived from a shallow autoencoder (SAE) trained on historical
-  recipient--template opens. This framework is purely collaborative: its scores
-  are derived from interactions alone and each campaign template is treated as
-  an opaque identifier, even though whether a message is opened depends not only
-  on collaborative patterns but also on its content. In this work, we
-  investigate how dense embeddings of template texts can add this missing
-  content signal to the SAE-based MAB by exploiting the similarity between
-  templates, while preserving its key properties: no retraining during active
-  learning and interpretable components. The original SAE-based MAB serves as
-  the baseline.
+  recipient--template opens. While the components of this framework are
+  interpretable at the level of recipients, the latent space of its autoencoder
+  is not: nothing makes the latent factors individually meaningful, so the
+  representation of a campaign template says little about what kind of campaign
+  it is. In this work, we investigate how disentangled latent factors can make
+  these template representations semantically meaningful. We combine Euler
+  encoding, a non-probabilistic disentanglement technique for autoencoders,
+  with latent factor guidance, which steers selected factors towards
+  template-level statistics derived from the interaction data, and explore the
+  move from a shallow to a deep autoencoder that this requires. Our goal is to
+  improve the interpretability of the SAE-based MAB and, if possible, its
+  retrieval performance, while preserving its key property of no retraining
+  during active learning. The original SAE-based MAB serves as the baseline.
 \end{abstract}
 
 \keywords{Email Outreach, Cold-Start Recommendation, Multi-Armed Bandits,
-Shallow Autoencoders, Text Embeddings}
+Autoencoders, Disentangled Representations, Interpretability}
 
 \maketitle
 
@@ -71,35 +74,72 @@ of the recipients and outperforms a range of baselines across most sending
 fractions. We refer to this model as the \emph{SAE-based MAB} (recapped in
 Section~\ref{sec:recap}) and use it as our baseline.
 
-The SAE-based MAB is purely collaborative: all its signals are derived from the
-interaction matrix, and a template is merely a row index in it. Yet whether a
-recipient opens a message depends not only on the CF signal, i.e., on patterns
-shared by recipients with similar behavior, but also on the item signal, i.e.,
-on the content of the message (e.g., a promotional offer versus a newsletter).
-Without the item signal, (1)~no CF signal for a new template exists at the start
-of a campaign, so the scores are template-independent and the first batch is the
-same for any new template, and (2)~the influence between recipients learned by
-the autoencoder is the same for all templates.
+The SAE-based MAB is interpretable at the level of recipients: the influence
+matrix $\Sigma$ states how strongly an open by one recipient signals an open by
+another, and each component of the score has a clear meaning. Campaign
+templates, however, are only rows of the interaction matrix, and the latent
+space through which the autoencoder compresses them has no semantic structure.
+The objective in Eq.~\eqref{eq:sae} depends on the encoder and decoder only
+through their product $ED^{\top}$, so the latent axes are arbitrary: any
+invertible linear transformation of the latent space yields the same model.
+Consequently, the latent representation of a template does not tell whether the
+template behaves like a promotional offer or a newsletter, how quickly it is
+usually opened, or how widely it appeals, and a marketer cannot relate the
+recipients selected for a campaign to the characteristics of the campaign. It is
+also open whether a more structured template representation can improve the
+selected batches, for example by letting the influence between recipients
+depend on what kind of campaign is being sent.
 
-The item signal is available precisely where the CF signal is missing: the text
-of a template is known before the first message is sent and can be encoded into
-a dense vector by a pretrained language model~\cite{reimers2019sentence}, and
-similarities between the embeddings identify past campaigns that are informative
-about the new one. Complementing the CF signal with item content is the idea of
-hybrid recommenders, which alleviate
-cold-start~\cite{wang2011collaborative,volkovs2017dropoutnet}. However, these
-methods learn content-to-latent mappings on large catalogs, which does not suit
-our setting: only 160 templates are available, retraining within a running
-campaign is undesirable, and interpretability is desired. The closest works
-either use contextual bandits to select promotional offers in email
-campaigns~\cite{kocherzhenko2022evaluating} or rely on structured attributes for
-active learning under item cold-start~\cite{zhu2019addressing}; to the best of
-our knowledge, neither uses the free text of campaigns in a CF-based recipient
-selection framework.
+Disentangled representation learning aims at latent spaces in which each
+dimension captures a single, independent factor of variation in the
+data~\cite{bengio2013representation,higgins2018towards}, which makes the
+representation easier to interpret. Most approaches build on variational
+autoencoders~\cite{kingma2014auto} and regularize the latent
+space~\cite{higgins2017beta,kim2018disentangling,chen2018isolating}, which
+requires balancing the regularizer against the reconstruction loss and assuming
+a prior. The disentangling autoencoder (DAE) of Cha and
+Thiyagalingam~\cite{cha2023orthogonality} instead uses a deterministic
+autoencoder with Euler encoding, a mapping of each latent variable to its cosine
+and sine motivated by the symmetry-based definition of
+disentanglement~\cite{higgins2018towards}, and needs no regularizer. Still,
+disentanglement without any inductive bias or supervision is not
+identifiable~\cite{locatello2019challenging}, so nothing guarantees that the
+learned factors are those a practitioner cares about, while even few labels can
+be effective~\cite{locatello2019disentangling}. CODAE~\cite{cha2025discovering}
+addresses this with latent factor guidance: an additional loss steers designated
+latent factors towards known quantities computed from the input itself (image
+moments) with a weight that decreases to zero during training, so the model can
+refine them, while Euler encoding disentangles the remaining factors. In
+recommendation, disentanglement has been used to separate user intents or item
+concepts~\cite{ma2019learning,wang2020disentangled}; a recent study finds
+that it correlates with the interpretability of the learned representation, but
+this does not necessarily carry over to the interpretability of the model's
+output~\cite{dervishaj2025are}.
+
+These ideas suit the SAE-based MAB for two reasons. First, guidance targets can
+be computed from the interaction matrix alone, e.g., the open rate or time-to-open
+statistics of each historical template, so no side information about recipients
+or messages is needed, which is important given the data protection constraints
+of email outreach~\cite{zid2025active}. Second, the latent factors describe
+templates, which is exactly the level at which the original model lacks
+semantics. To the best of our knowledge, guided disentangled latent factors
+have not been used in a CF-based recipient selection framework.
 % TODO: verify this claim with a more thorough literature search.
-We therefore investigate how template text embeddings can be incorporated into
-the SAE-based MAB while preserving its main properties: no retraining during
-active learning and interpretable components.
+Realizing them, however, changes the model: Euler encoding is a nonlinear layer,
+so the shallow autoencoder has to give way to a deep one, as in deep CF
+autoencoders~\cite{liang2018variational}, and the influence matrix $\Sigma$ is
+then no longer a closed-form product but has to be obtained from the network.
+
+We therefore investigate how guided disentangled latent factors can be
+incorporated into the SAE-based MAB while preserving its main properties: no
+retraining during active learning and interpretable components. Specifically, we
+(1)~replace the shallow autoencoder with a deep one whose latent space is
+passed through Euler encoding, (2)~guide a subset of latent factors towards
+template-level statistics derived from the interactions, and
+(3)~evaluate the result in two ways: disentanglement on a semi-synthetic dataset
+with known template factors using supervised metrics~\cite{carbonneau2022measuring},
+and, on real data, the relation of the factors to template statistics together
+with the recall of the selected recipients against the original model.
 
 \section{Recap of the Original Model}\label{sec:recap}
 
@@ -155,7 +195,89 @@ learning.
 
 \section{Methodology}
 
+\paragraph{Architecture.} We replace the SAE with a deep autoencoder that maps
+the open vector $x \in \{0,1\}^m$ of a template to a $d$-dimensional latent code
+$z$ and back,
+\begin{equation}\label{eq:arch}
+  \begin{aligned}
+    x \to \operatorname{Lin}(m,2d) \to \operatorname{ReLU} \to
+    \operatorname{Lin}(2d,d) = z \to \operatorname{Euler}(d,2d) \\
+    \to \operatorname{Lin}(2d,m) \to \sigma \to \hat{x}.
+  \end{aligned}
+\end{equation}
+The first and last layers hold $2dm$ weights each, which is large for
+$m = 131{,}918$ recipients compared to the number of training templates. We
+address this with standard regularization (e.g., weight decay and dropout) and
+expect the disentangling constraint to act as an additional regularizer.
+
+\paragraph{Euler encoding.} The Euler block follows the DAE~\cite{cha2023orthogonality}.
+The latent code is min-max normalized over the batch to $\bar{z} \in [0,1]^d$
+(with moving statistics at test time), scaled by $\Lambda \in \mathbb{R}^d$
+obtained from the singular values of a PCA of $X$, which accounts for factors
+with a different number of possible values, perturbed by Gaussian noise during
+training only, and finally mapped to
+\begin{equation}\label{eq:euler}
+  u_k = \bigl(\cos(2\pi \Lambda_k \bar{z}_k),\; \sin(2\pi \Lambda_k \bar{z}_k)\bigr),
+  \qquad k = 1, \dots, d.
+\end{equation}
+
+\paragraph{Latent factor guidance.} Following CODAE~\cite{cha2025discovering}, we
+steer a subset $\mathcal{G} \subseteq \{1,\dots,d\}$ of the normalized latent
+factors towards template-level statistics $g^{(k)} \in [0,1]$, which are
+computed from the interaction logs of the training templates (e.g., their open
+rate or time-to-open statistics) and rescaled to $[0,1]$. The loss is
+\begin{equation}\label{eq:loss}
+  \mathcal{L} = \ell(x, \hat{x}) + \beta(e) \sum_{k \in \mathcal{G}}
+  \bigl(\bar{z}_k - g^{(k)}\bigr)^2,
+\end{equation}
+where $\ell$ is the binary cross-entropy as in Eq.~\eqref{eq:sae} and the weight
+$\beta(e)$ decreases to zero with the training epoch $e$, so that the guided
+factors are first anchored to the statistics and then free to refine them. The
+remaining factors are not guided and are left to Euler encoding.
+% TODO: decide which statistics and how many factors to guide, and the decay schedule of beta.
+
+\paragraph{Scoring.} The arm score of Eq.~\eqref{eq:score} and Thompson Sampling
+of Eq.~\eqref{eq:ts} are kept, and only the network-derived quantities change:
+$f_j(t)$ is the reconstruction of recipient $j$ from the observed opens,
+$f_j(t) = \hat{x}(\bar{x}(t))_j$, and $p_j$ is the mean over $i \neq j$ of the
+reconstruction $\hat{x}(e_j)_i$ from the single open of recipient $j$, with $e_j$
+the $j$-th unit vector. Both are obtained with a fixed network, so no retraining
+is needed during active learning.
+
+\paragraph{Interpretation.} Since each latent factor is meant to capture one
+characteristic of a template, its meaning can be inspected by a traversal:
+decoding while varying one factor and fixing the others shows how the predicted
+opens of the recipients change. Guided factors have a known meaning from their
+statistic, and unguided factors are inspected manually.
+
 \section{Experiments}
+
+\paragraph{Protocol.} We follow the offline evaluation of \v{Z}id et
+al.~\cite{zid2025active}: the dataset of 131,918 recipients and 160 templates is
+split chronologically into training, validation (preceding 5 templates) and test
+(last 10 templates) sets, the delays of opens are simulated, the same deadline,
+batch size and number of batches are used, and the provider sends to a fraction
+$\tau$ of the recipients. Hyperparameters are selected on the validation set and
+results are the mean and standard deviation over ten simulations.
+
+\paragraph{Recommendation performance.} We evaluate the framework with
+$\mathrm{Recall}@\tau$, the share of the eventual openers among the contacted
+recipients, at the low sending fractions $\tau \in \{5, 15, 25, 35\}\%$, where
+the savings are largest. As an addition to the original protocol, we report the
+Recall-AUC, the area under the $\mathrm{Recall}@\tau$ curve over all
+$\tau \in [0, 100]\%$, which summarizes the whole curve in one number. The
+original SAE-based MAB is the baseline, re-evaluated under the same protocol so
+that the Recall-AUC is available for it, and we ablate Euler encoding and
+guidance in the deep autoencoder.
+
+\paragraph{Disentanglement.} The disentanglement is measured on a synthetic
+dataset with known template factors using supervised disentanglement
+metrics~\cite{carbonneau2022measuring}, and compared with the same deep
+autoencoder without Euler encoding. On the original dataset, no ground-truth
+factors exist, so we analyze the learned factors manually using latent factor
+traversals and, for the guided factors, their relation to the template
+statistics.
+% TODO: design of the synthetic generator.
 
 \section{Conclusion}
 
