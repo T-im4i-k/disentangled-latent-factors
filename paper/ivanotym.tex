@@ -16,7 +16,7 @@
 
 \begin{document}
 
-\title{Guided Disentangled Latent Factors for Interpretable Active Recipient Selection in Email Outreach}
+\title{Disentangled Latent Factors for Interpretable Active Recipient Selection in Email Outreach}
 
 \author{Tymofii Ivanov}
 \email{ivanotym@fit.cvut.cz}
@@ -37,12 +37,10 @@
   lacks semantic structure, and the latent representation of a campaign template
   therefore carries no explicit information about the characteristics of the
   campaign. In this work, we investigate how disentangled latent factors can
-  make these template representations semantically meaningful. We combine Euler
-  encoding, a non-probabilistic disentanglement technique for autoencoders,
-  with latent factor guidance, which steers selected factors towards
-  template-level statistics derived from the interaction data, and explore the
-  move from a shallow to a deep autoencoder that this requires. Our goal is to
-  improve the interpretability of the SAE-based MAB and, if possible, its
+  make these template representations semantically meaningful. We apply Euler
+  encoding, a non-probabilistic disentanglement technique for autoencoders, and
+  explore the move from a shallow to a deep autoencoder that this requires. Our
+  goal is to improve the interpretability of the SAE-based MAB and, if possible, its
   retrieval performance, while preserving its key property of no retraining
   during active learning. The original SAE-based MAB serves as the baseline.
 \end{abstract}
@@ -98,46 +96,34 @@ a prior. The disentangling autoencoder (DAE) of Cha and
 Thiyagalingam~\cite{cha2023orthogonality} instead uses a deterministic
 autoencoder with Euler encoding, a mapping of each latent variable to its cosine
 and sine motivated by the symmetry-based definition of
-disentanglement~\cite{higgins2018towards}, and needs no regularizer. Still,
+disentanglement~\cite{higgins2018towards}, and needs no regularizer. This is consistent with the result that
 disentanglement without any inductive bias or supervision is not
-identifiable~\cite{locatello2019challenging}, so nothing guarantees that the
-learned factors are those a practitioner cares about, while even few labels can
-be effective~\cite{locatello2019disentangling}. CODAE~\cite{cha2025discovering}
-addresses this with latent factor guidance: an additional loss steers designated
-latent factors towards known quantities computed from the input itself (image
-moments) with a weight that decreases to zero during training, so the model can
-refine them, while Euler encoding disentangles the remaining factors. In
+identifiable~\cite{locatello2019challenging}: in the DAE, the inductive bias is
+built into the architecture through Euler encoding. In
 recommendation, disentanglement has been used to separate user intents or item
 concepts~\cite{ma2019learning,wang2020disentangled}; a recent study finds
 that it correlates with the interpretability of the learned representation, but
 this does not necessarily carry over to the interpretability of the model's
 output~\cite{dervishaj2025are}.
 
-Latent factor guidance is well suited to the SAE-based MAB framework, since the
-guidance targets, such as the open rate or time-to-open statistics of each
-historical template, can be computed from the interaction data alone. No side
-information about recipients or messages is therefore required, which is
-relevant given the data protection constraints of email
-outreach~\cite{zid2025active}. Euler encoding, in turn, applies a nonlinear
-transformation to the latent code, which motivates replacing the shallow
-autoencoder with a deep one, as in deep CF
+Euler encoding applies a nonlinear transformation to the latent code, which
+motivates replacing the shallow autoencoder with a deep one, as in deep CF
 autoencoders~\cite{liang2018variational}. In a deep autoencoder, the influence
 matrix $\Sigma$ is no longer given directly by the weights and has to be
 computed by propagating single-recipient opens through the network.
-To the best of our knowledge, guided disentangled latent factors have not been
-used in a CF-based recipient selection framework.
+To the best of our knowledge, disentangled latent factors have not been used in
+a CF-based recipient selection framework.
 % TODO: verify this claim with a more thorough literature search.
 
-We therefore investigate how guided disentangled latent factors can be
-incorporated into the SAE-based MAB while preserving its main properties: no
-retraining during active learning and interpretable components. Specifically, we
+We therefore investigate how disentangled latent factors can be incorporated
+into the SAE-based MAB while preserving its main properties: no retraining
+during active learning and interpretable components. Specifically, we
 (1)~replace the shallow autoencoder with a deep one whose latent space is
-passed through Euler encoding, (2)~guide a subset of latent factors towards
-template-level statistics derived from the interactions, and
-(3)~evaluate the result in two ways: disentanglement on a semi-synthetic dataset
-with known template factors using supervised metrics~\cite{carbonneau2022measuring},
-and, on real data, the relation of the factors to template statistics together
-with the recall of the selected recipients against the original model.
+passed through Euler encoding, and (2)~evaluate the result in two ways:
+disentanglement on a semi-synthetic dataset with known template factors using
+supervised metrics~\cite{carbonneau2022measuring}, and, on real data, the
+learned factors together with the recall of the selected recipients against the
+original model.
 
 \section{Recap of the Original Model}\label{sec:recap}
 
@@ -208,29 +194,25 @@ standard regularization techniques and expect the disentangling constraint to
 help as well.
 
 \paragraph{Euler encoding.} The Euler block follows the DAE~\cite{cha2023orthogonality}
-and its use in CODAE~\cite{cha2025discovering}. Each latent factor is min-max
-normalized over the batch to $\bar{z}_k \in [0,1]$ (with moving statistics at
-test time) and then stretched by a learnable affine map
-$y_k = \beta_k + \gamma_k \bar{z}_k$, which lets the model choose the arc of the
-circle each factor occupies. The result is mapped to
+and its use in CODAE~\cite{cha2025discovering}. The latent code $z$ of each
+template is first min-max normalized over the layer, i.e., across its $d$
+factors,
+\begin{equation}\label{eq:layernorm}
+  \bar{z}_k = \frac{z_k - \min_{l} z_l}{\max_{l} z_l - \min_{l} z_l + \varepsilon}
+  \in [0,1],
+\end{equation}
+independently of the other templates, so that no batch or moving statistics are
+needed at test time. The normalized factors are then stretched by a learnable
+affine map $y_k = \beta_k + \gamma_k \bar{z}_k$, which lets the model choose the
+arc of the circle each factor occupies. The result is mapped to
 \begin{equation}\label{eq:euler}
   u_k = \bigl(\cos y_k,\; \sin y_k\bigr), \qquad k = 1, \dots, d.
 \end{equation}
 
-\paragraph{Latent factor guidance.} Following CODAE~\cite{cha2025discovering}, we
-steer a subset $\mathcal{G} \subseteq \{1,\dots,d\}$ of the normalized latent
-factors towards template-level statistics $g^{(k)} \in [0,1]$, which are
-computed from the interaction logs of the training templates (e.g., their open
-rate or time-to-open statistics) and rescaled to $[0,1]$. The loss is
-\begin{equation}\label{eq:loss}
-  \mathcal{L} = \ell(x, \hat{x}) + \beta(e) \sum_{k \in \mathcal{G}}
-  \bigl(\bar{z}_k - g^{(k)}\bigr)^2,
-\end{equation}
-where $\ell$ is the binary cross-entropy as in Eq.~\eqref{eq:sae} and the weight
-$\beta(e)$ decreases to zero with the training epoch $e$, so that the guided
-factors are first anchored to the statistics and then free to refine them. The
-remaining factors are not guided and are left to Euler encoding.
-% TODO: decide which statistics and how many factors to guide, and the decay schedule of beta.
+\paragraph{Training.} The autoencoder is trained with the binary cross-entropy
+$\ell(x, \hat{x})$ of Eq.~\eqref{eq:sae} alone. As in the
+DAE~\cite{cha2023orthogonality}, the disentanglement is driven by the Euler
+encoding, without any additional regularizer or supervision.
 
 \paragraph{Scoring.} The arm score of Eq.~\eqref{eq:score} and Thompson Sampling
 of Eq.~\eqref{eq:ts} are kept, and only the network-derived quantities change:
@@ -243,8 +225,7 @@ is needed during active learning.
 \paragraph{Interpretation.} Since each latent factor is meant to capture one
 characteristic of a template, its meaning can be inspected by a traversal:
 decoding while varying one factor and fixing the others shows how the predicted
-opens of the recipients change. Guided factors have a known meaning from their
-statistic, and unguided factors are inspected manually.
+opens of the recipients change. The meaning of the factors is inspected manually.
 
 \section{Experiments}
 
@@ -263,16 +244,15 @@ the savings are largest. As an addition to the original protocol, we report the
 Recall-AUC, the area under the $\mathrm{Recall}@\tau$ curve over all
 $\tau \in [0, 100]\%$, which summarizes the whole curve in one number. The
 original SAE-based MAB is the baseline, re-evaluated under the same protocol so
-that the Recall-AUC is available for it, and we ablate Euler encoding and
-guidance in the deep autoencoder.
+that the Recall-AUC is available for it, and we ablate Euler encoding in the
+deep autoencoder.
 
 \paragraph{Disentanglement.} The disentanglement is measured on a synthetic
 dataset with known template factors using supervised disentanglement
 metrics~\cite{carbonneau2022measuring}, and compared with the same deep
 autoencoder without Euler encoding. On the original dataset, no ground-truth
 factors exist, so we analyze the learned factors manually using latent factor
-traversals and, for the guided factors, their relation to the template
-statistics.
+traversals.
 % TODO: design of the synthetic generator.
 
 \section{Conclusion}
