@@ -72,6 +72,17 @@ of the recipients and outperforms a range of baselines across most sending
 fractions. We refer to this model as the \emph{SAE-based MAB} (recapped in
 Section~\ref{sec:recap}) and use it as our baseline.
 
+\begin{figure*}[t]
+  \centering
+  \includegraphics[width=0.92\textwidth]{architecture.pdf}
+  \caption{Architecture of the deep autoencoder. The open vector $x$ of a
+  template is encoded into a $d$-dimensional latent code $z$, which is
+  min-max normalized over the layer to $\bar{z}$ and mapped by the Euler block
+  to $u \in \mathbb{R}^{2d}$. The decoder reconstructs the open probabilities
+  $\hat{x}$ of all recipients.}
+  \label{fig:arch}
+\end{figure*}
+
 The SAE-based MAB is interpretable at the level of recipients: the influence
 matrix $\Sigma$ states how strongly an open by one recipient signals an open by
 another, and each component of the score has a clear meaning. The templates,
@@ -181,14 +192,12 @@ learning.
 
 \paragraph{Architecture.} We replace the SAE with a deep autoencoder that maps
 the open vector $x \in \{0,1\}^m$ of a template to a $d$-dimensional latent code
-$z$ and back,
-\begin{equation}\label{eq:arch}
-  \begin{aligned}
-    x \to \operatorname{Lin}(m,2d) \to \operatorname{ReLU} \to
-    \operatorname{Lin}(2d,d) = z \to \operatorname{Euler}(d,2d) \\
-    \to \operatorname{Lin}(2d,m) \to \sigma \to \hat{x}.
-  \end{aligned}
-\end{equation}
+$z$ and back (Fig.~\ref{fig:arch}). The encoder consists of a linear layer from
+$m$ to $2d$ units followed by a ReLU, and a second linear layer from $2d$ to $d$
+units, which produces $z$. The latent code is then min-max normalized over the
+layer and passed through the Euler block, which expands the $d$ factors into
+$2d$ values. The decoder is a single linear layer from $2d$ to $m$ units followed
+by a sigmoid, which yields the reconstruction $\hat{x}$.
 This model is larger than the original SAE. We address this with
 standard regularization techniques and expect the disentangling constraint to
 help as well.
