@@ -88,9 +88,6 @@ matrix $\Sigma$ states how strongly an open by one recipient signals an open by
 another, and each component of the score has a clear meaning. The templates,
 however, are represented only implicitly, through their open vectors compressed
 by the autoencoder, and the resulting latent space has no semantic structure.
-The objective in Eq.~\eqref{eq:sae} depends on the encoder and decoder only
-through their product $ED^{\top}$, so the latent axes are arbitrary: any
-invertible linear transformation of the latent space yields the same model.
 Consequently, the latent representation of a template cannot be related to
 interpretable characteristics of the campaign. Whether a semantically
 structured template representation can also improve the selected batches
@@ -123,7 +120,7 @@ autoencoders~\cite{liang2018variational}. In a deep autoencoder, the influence
 matrix $\Sigma$ is no longer given directly by the weights and has to be
 computed by propagating single-recipient opens through the network.
 To the best of our knowledge, disentangled latent factors have not been used in
-a CF-based recipient selection framework.
+a CF-based recipient selection framework before.
 % TODO: verify this claim with a more thorough literature search.
 
 We therefore investigate how disentangled latent factors can be incorporated
@@ -226,7 +223,7 @@ encoding, without any additional regularizer or supervision.
 \paragraph{Scoring.} The arm score of Eq.~\eqref{eq:score} and Thompson Sampling
 of Eq.~\eqref{eq:ts} are kept, and only the network-derived quantities change:
 $f_j(t)$ is the reconstruction of recipient $j$ from the observed opens,
-$f_j(t) = \hat{x}(\bar{x}(t))_j$, and $p_j$ is the mean over $i \neq j$ of the
+$f_j(t) = \hat{x}(x(t))_j$, and $p_j$ is the mean over $i \neq j$ of the
 reconstruction $\hat{x}(e_j)_i$ from the single open of recipient $j$, with $e_j$
 the $j$-th unit vector. Both are obtained with a fixed network, so no retraining
 is needed during active learning.
@@ -243,8 +240,7 @@ al.~\cite{zid2025active}: the dataset of 131,918 recipients and 160 templates is
 split chronologically into training, validation (preceding 5 templates) and test
 (last 10 templates) sets, the delays of opens are simulated, the same deadline,
 batch size and number of batches are used, and the provider sends to a fraction
-$\tau$ of the recipients. Hyperparameters are selected on the validation set and
-results are the mean and standard deviation over 10 simulations.
+$\tau$ of the recipients. Hyperparameters are selected on the validation set using Recall-AUC.
 
 \paragraph{Recommendation performance.} We evaluate the framework with
 $\mathrm{Recall}@\tau$, the share of the eventual openers among the contacted
